@@ -52,9 +52,12 @@ const GAMMA = 0.9;
 const MAX_EPISODES = 2000;
 const EPSILON = 0.2;
 const INITIAL_MUTATION_ALPHA = 0.3; // initial mutation rate
-const MUTATION_DECAY = 0.99; // decay factor for mutation rate
+const MUTATION_DECAY = 0.995; // decay factor for mutation rate
 const RELATIVE_PERFORMANCE_AVERAGE_DURATION = 5; // Adjust based on your specific use case
-const RELATIVE_PERFORMANCE_THRESHOLD = 0.9; // Adjust based on your specific use case
+const RELATIVE_PERFORMANCE_THRESHOLD = 0.75; // Adjust based on your specific use case
+const VELOCITY_THRESHOLD = 0.1;
+const Q_KEY_ACCURACY = 100;
+const Q_KEY_INCLUDE_VELOCITY = false;
 let episodeCount = 0;
 let iterationsCount = 0;
 let bestScore = -Infinity;
@@ -176,14 +179,22 @@ const target = Bodies.circle(700, 100, 60, {
 World.add(engine.world, [target]);
 
 // Helper Functions
-const getState = (obj: any) => `${Math.floor(obj.position.x / 100)}:${Math.floor(obj.position.y / 100)}`;
-
 const getExtendedState = (obj: any) => {
-  const roundedX = Math.round(obj.position.x / 100);
-  const roundedY = Math.round(obj.position.y / 100);
-  const roundedVX = Math.sign(obj.velocity.x);
-  const roundedVY = Math.sign(obj.velocity.y);
-  return `${roundedX}:${roundedY}:${roundedVX}:${roundedVY}`;
+  const roundedX = Math.round(obj.position.x / Q_KEY_ACCURACY);
+  const roundedY = Math.round(obj.position.y / Q_KEY_ACCURACY);
+  
+  let roundedVX = Math.sign(obj.velocity.x);
+  let roundedVY = Math.sign(obj.velocity.y);
+
+  if (Math.abs(obj.velocity.x) < VELOCITY_THRESHOLD) {
+    roundedVX = 0;
+  }
+  
+  if (Math.abs(obj.velocity.y) < VELOCITY_THRESHOLD) {
+    roundedVY = 0;
+  }
+
+  return Q_KEY_INCLUDE_VELOCITY ? `${roundedX}:${roundedY}:${roundedVX}:${roundedVY}` : `${roundedX}:${roundedY}`;
 };
 
 const updateQValue = (s: string, a: string, r: number, sNext: string, ballId: string) => {
@@ -271,7 +282,7 @@ const updateRL = (ball: any, defaultReward: number, _index: number) => {
   }
 
   const action = chooseAction(extendedCurrentState, ball.id.toString());
-  const nextState = getState(ball);
+  const nextState = getExtendedState(ball);
   updateQValue(extendedCurrentState, action, reward, nextState, ball.id.toString());
   
   if (scores[ball.id] > bestScore) {
@@ -388,9 +399,9 @@ Events.on(engine, 'collisionStart', (event) => {
         }
 
         // Update Q-values for the current ball
-        const currentState = getState(ball);
+        const currentState = getExtendedState(ball);
         const action = chooseAction(currentState, ball.id);
-        const nextState = getState(ball);
+        const nextState = getExtendedState(ball);
         updateQValue(currentState, action, reward, nextState, ball.id.toString());
       }
     });
@@ -420,7 +431,10 @@ const updatePerformance = (newPerformance: number) => {
 
   if (averagePerformance <= lastPerformanceAverage * RELATIVE_PERFORMANCE_THRESHOLD) {
     console.log('apply mutation alpha correction!');
-    currentMutationAlpha /= MUTATION_DECAY**2; // Increase alpha
+    console.log(currentMutationAlpha)
+    currentMutationAlpha /= MUTATION_DECAY; // Increase alpha, revert last decay
+    currentMutationAlpha /= MUTATION_DECAY; // Increase alpha
+    console.log(currentMutationAlpha)
     if (currentMutationAlpha > 0.5) {
       currentMutationAlpha = 0.5; // Set an upper bound
     }
