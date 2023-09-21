@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RL with Matter.js and Chart.js</title>
+  <script type="module" src="/src/main.ts"></script>
+</head>
+<body>
+  <div id="matterContainer" style="width: 800px; height: 600px;"></div>
+  <canvas id="iterationsChart" width="400" height="200"></canvas>
+  <canvas id="myChart" width="400" height="200"></canvas>
+  <div id="iterations" style="position: absolute; right: 0; top: 0; margin: 10px; font-size: 24px;">Iteration 0</div>
+  <div id="episodes" style="position: absolute; right: 0; top: 50px; margin: 10px; font-size: 20px;">Episode 0</div>
+  <div id="successful" style="position: absolute; right: 0; top: 100px; margin: 10px; font-size: 20px;">No successful ball yet</div>
+  <div id="streak" style="position: absolute; right: 0; top: 150px; margin: 10px; font-size: 20px;">Streak (same ball): 0</div>
+  <div id="rate" style="position: absolute; right: 0; top: 200px; margin: 10px; font-size: 20px;">No learning rate</div>
+</body>
+</html>
