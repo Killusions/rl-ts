@@ -42,6 +42,13 @@ const iterationsChart = new Chart(ictx, {
       fill: false,
       borderColor: 'rgb(227, 25, 25)',
       tension: 0.1
+    },
+    {
+      label: 'Randomness rate (Exploration Epsilon) (1 / 1000)',
+      data: [] as number[], // Explicit type
+      fill: false,
+      borderColor: 'rgb(19, 214, 42)',
+      tension: 0.1
     }]
   }
 });
@@ -50,11 +57,15 @@ const iterationsChart = new Chart(ictx, {
 const ALPHA = 0.1;
 const GAMMA = 0.9;
 const MAX_EPISODES = 2000;
-const EPSILON = 0.2;
+const ENABLE_CORRECTION = false;
+const INITIAL_EXPLORATION_EPSILON = 0.2; // initial exploration rate
+const EXPLORATION_DECAY = 0.9995; // decay factor for exploration rate
+const EXPLORATION_CORRECTION = 1.1; // correction factor for exploration rate
 const INITIAL_MUTATION_ALPHA = 0.3; // initial mutation rate
 const MUTATION_DECAY = 0.995; // decay factor for mutation rate
+const MUTATION_CORRECTION = 1.1; // correction factor for mutation rate
 const RELATIVE_PERFORMANCE_AVERAGE_DURATION = 5; // Adjust based on your specific use case
-const RELATIVE_PERFORMANCE_THRESHOLD = 0.75; // Adjust based on your specific use case
+const RELATIVE_PERFORMANCE_THRESHOLD = 0.5; // Adjust based on your specific use case
 const VELOCITY_THRESHOLD = 0.1;
 const Q_KEY_ACCURACY = 100;
 const Q_KEY_INCLUDE_VELOCITY = false;
@@ -221,9 +232,12 @@ const updateQValue = (s: string, a: string, r: number, sNext: string, ballId: st
   qTable.set(`${s}:${a}`, updatedQ);
 };
 
+let currentExplorationEpsilon = INITIAL_EXPLORATION_EPSILON;
+document.getElementById('randomness')!.innerHTML = 'Randomness rate: ' + currentExplorationEpsilon.toPrecision(3);
+
 const chooseAction = (state: string, ballId: string) => {
   const qTable = Q.get(ballId) ?? new Map();
-  if (Math.random() < EPSILON) {
+  if (Math.random() < currentExplorationEpsilon) {
     // Exploration: random action
     const actions = ['left', 'right', 'up', 'down'];
     return actions[Math.floor(Math.random() * actions.length)];
@@ -376,6 +390,7 @@ Events.on(engine, 'collisionStart', (event) => {
           document.getElementById('successful')!.innerHTML = 'Last successful ball ID: ' + ball.id.toString();
           document.getElementById('streak')!.innerHTML = 'Streak (same ball): ' + successfulBallStreak.toString();
           document.getElementById('rate')!.innerHTML = 'Learning rate: ' + currentMutationAlpha.toPrecision(3);
+          document.getElementById('randomness')!.innerHTML = 'Randomness rate: ' + currentExplorationEpsilon.toPrecision(3);
           myChart.data.labels!.splice(0, myChart.data.labels!.length);
           myChart.data.datasets![0].data!.splice(0, myChart.data.datasets![0].data!.length);
           myChart.data.datasets![1].data!.splice(0, myChart.data.datasets![1].data!.length);
@@ -383,6 +398,7 @@ Events.on(engine, 'collisionStart', (event) => {
           iterationsChart.data.labels!.push(`${iterationsCount}`);
           iterationsChart.data.datasets![0].data!.push(episodeCount);
           iterationsChart.data.datasets![1].data!.push(currentMutationAlpha * 1000);
+          iterationsChart.data.datasets![2].data!.push(currentExplorationEpsilon * 1000);
           iterationsChart.update();
           episodeCount = 0;
 
@@ -429,14 +445,16 @@ const updatePerformance = (newPerformance: number) => {
     return;
   }
 
-  if (averagePerformance <= lastPerformanceAverage * RELATIVE_PERFORMANCE_THRESHOLD) {
+  if (ENABLE_CORRECTION && averagePerformance <= lastPerformanceAverage * RELATIVE_PERFORMANCE_THRESHOLD) {
     console.log('apply mutation alpha correction!');
-    console.log(currentMutationAlpha)
-    currentMutationAlpha /= MUTATION_DECAY; // Increase alpha, revert last decay
-    currentMutationAlpha /= MUTATION_DECAY; // Increase alpha
-    console.log(currentMutationAlpha)
+    currentMutationAlpha *= MUTATION_CORRECTION; // Increase alpha
     if (currentMutationAlpha > 0.5) {
       currentMutationAlpha = 0.5; // Set an upper bound
+    }
+    console.log('apply exploration epsilon correction!');
+    currentExplorationEpsilon *= EXPLORATION_CORRECTION; // Increase alpha
+    if (currentExplorationEpsilon > 0.35) {
+      currentExplorationEpsilon = 0.35; // Set an upper bound
     }
   }
 
@@ -459,6 +477,12 @@ const mutateQValues = (originalQTable: Map<string, number>) => {
   currentMutationAlpha *= MUTATION_DECAY;
   if (currentMutationAlpha < 0.01) {
     currentMutationAlpha = 0.01; // set a lower bound
+  }
+
+  // Decay the exploration epsilon
+  currentExplorationEpsilon *= EXPLORATION_DECAY;
+  if (currentExplorationEpsilon < 0.01) {
+    currentExplorationEpsilon = 0.01; // set a lower bound
   }
 
   return mutatedQTable;
